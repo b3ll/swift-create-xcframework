@@ -1,109 +1,118 @@
-const core = require('./.action/core')
-const exec = require('./.action/exec')
-const path = require('path')
-const artifact = require('././.action/artifact')
-const fs = require('fs')
+const core = require("./.action/core");
+const exec = require("./.action/exec");
+const path = require("path");
+const artifact = require("././.action/artifact");
+const fs = require("fs");
 
-const scxVersion = '1.0.5'
-const outputPath = '.build/xcframework-zipfile.url'
+const scxVersion = "1.3.1";
+const outputPath = ".build/xcframework-zipfile.url";
 
-core.setCommandEcho(true)
+core.setCommandEcho(true);
 
-async function run () {
-    try {
-        let packagePath = core.getInput('path', { required: false })
-        let targets = core.getInput('target', { required: false })
-        let configuration = core.getInput('configuration', { required: false })
-        let platforms = core.getInput('platforms', { required: false })
-        let xcconfig = core.getInput('xcconfig', { required: false })
+async function run() {
+  try {
+    let packagePath = core.getInput("path", { required: false });
+    let targets = core.getInput("target", { required: false });
+    let configuration = core.getInput("configuration", { required: false });
+    let platforms = core.getInput("platforms", { required: false });
+    let xcconfig = core.getInput("xcconfig", { required: false });
 
-        // install mint if its not installed
-        await installUsingBrewIfRequired("mint")
+    // install mint if its not installed
+    await installUsingBrewIfRequired("mint");
 
-        // install ourselves if not installed
-        await installUsingMintIfRequired('swift-create-xcframework', 'unsignedapps/swift-create-xcframework')
+    // install ourselves if not installed
+    await installUsingMintIfRequired(
+      "swift-create-xcframework",
+      "b3ll/swift-create-xcframework"
+    );
 
-        // put together our options
-        var options = [ '--zip', '--github-action' ]
-        if (!!packagePath) {
-            options.push('--package-path')
-            options.push(packagePath)
-        }
-
-        if (!!configuration) {
-            options.push('--configuration')
-            options.push(configuration)
-        }
-
-        if (!!xcconfig) {
-            options.push('--xcconfig')
-            options.push(xcconfig)
-        }
-
-        if (!!platforms) {
-            platforms
-                .split(',')
-                .map((p) => p.trim())
-                .forEach((platform) => {
-                    options.push('--platform')
-                    options.push(platform)
-                })
-        }
-
-        if (!targets) {
-            targets
-                .split(',')
-                .map((t) => t.trim())
-                .filter((t) => t.length > 0)
-                .forEach((target) => {
-                    options.push(target)
-                })
-        }
-
-        await exec.exec('swift-create-xcframework', options)
-
-        let client = artifact.create()
-        let files = fs.readFileSync(outputPath, { encoding: 'utf8' })
-            .split('\n')
-            .map((file) => file.trim())
-
-        for (var i = 0, c = files.length; i < c; i++) {
-            let file = files[i]
-            let name = path.basename(file)
-            await client.uploadArtifact(name, [ file ], path.dirname(file))
-        }
-
-    } catch (error) {
-        core.setFailed(error)
+    // put together our options
+    var options = ["--zip", "--github-action"];
+    if (!!packagePath) {
+      options.push("--package-path");
+      options.push(packagePath);
     }
-}
 
-async function installUsingBrewIfRequired (package) {
-    if (await isInstalled(package)) {
-        core.info(package + " is already installed.")
-
-    } else {
-        core.info("Installing " + package)
-        await exec.exec('brew', [ 'install', package ])
+    if (!!configuration) {
+      options.push("--configuration");
+      options.push(configuration);
     }
-}
 
-async function installUsingMintIfRequired (command, package) {
-    if (await isInstalled(command)) {
-        core.info(command + " is already installed")
-
-    } else {
-        core.info("Installing " + package)
-        await exec.exec('mint', [ 'install', 'unsignedapps/swift-create-xcframework@' + scxVersion ])
+    if (!!xcconfig) {
+      options.push("--xcconfig");
+      options.push(xcconfig);
     }
+
+    if (!!platforms) {
+      platforms
+        .split(",")
+        .map((p) => p.trim())
+        .forEach((platform) => {
+          options.push("--platform");
+          options.push(platform);
+        });
+    }
+
+    if (!targets) {
+      targets
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0)
+        .forEach((target) => {
+          options.push(target);
+        });
+    }
+
+    await exec.exec("swift-create-xcframework", options);
+
+    let client = artifact.create();
+    let files = fs
+      .readFileSync(outputPath, { encoding: "utf8" })
+      .split("\n")
+      .map((file) => file.trim());
+
+    for (var i = 0, c = files.length; i < c; i++) {
+      let file = files[i];
+      let name = path.basename(file);
+      await client.uploadArtifact(name, [file], path.dirname(file));
+    }
+  } catch (error) {
+    core.setFailed(error);
+  }
 }
 
-async function isInstalled (command) {
-    return await exec.exec('which', [ command ], { silent: true, failOnStdErr: false, ignoreReturnCode: true }) == 0
+async function installUsingBrewIfRequired(package) {
+  if (await isInstalled(package)) {
+    core.info(package + " is already installed.");
+  } else {
+    core.info("Installing " + package);
+    await exec.exec("brew", ["install", package]);
+  }
 }
 
-run()
+async function installUsingMintIfRequired(command, package) {
+  if (await isInstalled(command)) {
+    core.info(command + " is already installed");
+  } else {
+    core.info("Installing " + package);
+    await exec.exec("mint", [
+      "install",
+      "b3ll/swift-create-xcframework@" + scxVersion,
+    ]);
+  }
+}
 
+async function isInstalled(command) {
+  return (
+    (await exec.exec("which", [command], {
+      silent: true,
+      failOnStdErr: false,
+      ignoreReturnCode: true,
+    })) == 0
+  );
+}
+
+run();
 
 // Kuroneko:swift-create-xcframework bok$ swift create-xcframework --help
 // OVERVIEW: Creates an XCFramework out of a Swift Package using xcodebuild
